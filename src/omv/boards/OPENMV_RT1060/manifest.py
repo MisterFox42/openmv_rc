@@ -32,3 +32,6 @@ freeze ("$(OMV_LIB_DIR)/", "mutex.py")
 
 # Bluetooth
 require("aioble")
+
+# Main
+freeze ("$(OMV_LIB_DIR)/", "boot.py")
