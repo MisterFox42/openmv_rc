@@ -8,6 +8,9 @@ import image
 from machine import UART, SoftI2C, Pin, LED
 from image import SEARCH_EX
 
+templatefid = image.Image("/templateheat.pgm")
+template24 = image.Image("/template24V.pgm")
+template48 = image.Image("/template48V.pgm")
 
 version_text="OPENMV_MX_Machinevision_Recom-Maximilian_Haidn-v1.22 \r\n"
 
@@ -23,12 +26,14 @@ CMD="Null"
 VALUE="Null"
 recd_str="None"
 
-led = LED("LED_BLUE")
+ledblue = LED("LED_BLUE")
+ledgreen = LED("LED_GREEN")
+ledred = LED("LED_RED")
 
 #i2c = machine.I2C(1, freq=400000)
 i2c  = SoftI2C(scl=Pin('P0'), sda=Pin('P1'), freq=100000)
 #i2cs  = SoftI2C(scl=Pin('P1'), sda=Pin('P0'), freq=100000)
-print("I2C Devices:",i2c.scan())
+print("I2C Devices found:",i2c.scan())
 
 EXPOSURE_MICROSECONDS = 20000 #4000
 TRACKING_RESOLUTION = sensor.QQVGA
@@ -41,10 +46,8 @@ sensor.set_auto_gain(False, gain_db=20)
 sensor.set_auto_whitebal(False)
 clock = time.clock()
 
-template24 = image.Image("/template24V.pgm")
-template48 = image.Image("/template48V.pgm")
-#templatefid = image.Image("/template48V.pgm")
-templatefid = image.Image("/templateheat.pgm")
+
+
 
 thresholds = [
 (25, 100, -128, -26, -128, 127),
@@ -309,13 +312,13 @@ try:
 except Exception as e:
     print(e)
 
-
+ledgreen.on()
 while True:
     clock.tick()
-    led.off()
+    ledblue.off()
     img = sensor.snapshot()
     if usb.any():
-        led.on()
+        ledblue.on()
         print("recd_data")
         try:
             recd_data=usb.read()
