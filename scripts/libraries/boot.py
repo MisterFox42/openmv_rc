@@ -5,10 +5,11 @@ import ustruct
 import time
 import machine
 import image
-from machine import UART, SoftI2C, Pin
+from machine import UART, SoftI2C, Pin, LED
 from image import SEARCH_EX
 
-version_text="OPENMV_MX_Machinevision_Recom-Maximilian_Haidn-v1.21 \r\n"
+
+version_text="OPENMV_MX_Machinevision_Recom-Maximilian_Haidn-v1.22 \r\n"
 
 i=0
 usb_ena=False
@@ -21,6 +22,8 @@ FCT="Null"
 CMD="Null"
 VALUE="Null"
 recd_str="None"
+
+led = LED("LED_BLUE")
 
 #i2c = machine.I2C(1, freq=400000)
 i2c  = SoftI2C(scl=Pin('P0'), sda=Pin('P1'), freq=100000)
@@ -40,7 +43,8 @@ clock = time.clock()
 
 template24 = image.Image("/template24V.pgm")
 template48 = image.Image("/template48V.pgm")
-templatefid = image.Image("/templatefid.pgm")
+#templatefid = image.Image("/template48V.pgm")
+templatefid = image.Image("/templateheat.pgm")
 
 thresholds = [
 (25, 100, -128, -26, -128, 127),
@@ -67,7 +71,7 @@ for n, roi in enumerate (dip_roi):
 print(dip_roi_sanity)
 
 #VGA
-template_roi=(435,0,70,50)
+template_roi=(420,20,70,150)
 positionmatch_roi=(351,239,221,165)
 locked_template_pos=(0,0,0,0)
 offset_roi=(0,0,0,0)
@@ -76,13 +80,16 @@ Led=[0,0,0,0,0]
 Dip=[0,0,0,0,0]
 Dip_s=[0,0,0,0,0]
 
+
 #APA102C
 led_array_set=(0,0,0,0)
+all_led_array_set=(0,0,0)
 w = 500
 h = 400
 x=-300
 y=-100
 
+#Position according to heat symbol
 def positionmatch():
     sensorpixformat=sensor.get_pixformat()
     sensorframesize=sensor.get_framesize()
@@ -110,9 +117,9 @@ def positionmatch():
     time.sleep(0.1)
     sensor.set_pixformat(sensorpixformat)
     sensor.set_framesize(sensorframesize)
-    return("None")
+    #return("None")
 
-
+# Detect Model Type
 def templatematch():
     sensorpixformat=sensor.get_pixformat()
     sensorframesize=sensor.get_framesize()
@@ -124,7 +131,7 @@ def templatematch():
     time.sleep_ms(200)
     img = sensor.snapshot()
     time.sleep_ms(50)
-    img.draw_rectangle(template_roi)
+    img.draw_rectangle(tuple(map(lambda i, j: i + j, template_roi, offset_roi)))
     r = img.find_template(
         template24, 0.70, step=4, search=SEARCH_EX, roi=template_roi)
     if r:
@@ -150,7 +157,7 @@ def templatematch():
     sensor.set_framesize(sensorframesize)
     return("None")
 
-
+# Detect and cross check dip switch position
 def dip_detect():
     sensorpixformat=sensor.get_pixformat()
     sensorframesize=sensor.get_framesize()
@@ -290,19 +297,26 @@ def set_all_ledcolor(red, green, blue):
 
 
 time.sleep(0.2)
-locked_template_pos=positionmatch()
-print(locked_template_pos)
-offset_new = list(offset_new)
-offset_new[0]=locked_template_pos[0]-410 #X-Offset
-offset_new[1]=locked_template_pos[1]-297 #Y-Offset
-offset_roi = tuple(offset_new)
-print(offset_roi)
+
+try:
+    locked_template_pos=positionmatch()
+    print(locked_template_pos)
+    offset_new = list(offset_new)
+    offset_new[0]=locked_template_pos[0]-410 #X-Offset
+    offset_new[1]=locked_template_pos[1]-297 #Y-Offset
+    offset_roi = tuple(offset_new)
+    print(offset_roi)
+except Exception as e:
+    print(e)
 
 
 while True:
     clock.tick()
+    led.off()
     img = sensor.snapshot()
     if usb.any():
+        led.on()
+        print("recd_data")
         try:
             recd_data=usb.read()
             recd_data=str(recd_data)
@@ -344,51 +358,53 @@ while True:
                             usb.write(str(dp))
                         usb.write("\r\n")
                     if CMD == "DIP_ROI?":
-                        usb.write(dip_roi)
+                        usb.write(str(dip_roi))
                         usb.write("\r\n")
                     if CMD == "LED_ROI?":
-                        usb.write(led_roi)
+                        usb.write(str(led_roi))
                         usb.write("\r\n")
                     if CMD == "MODEL_ROI?":
-                        usb.write(model_roi)
+                        usb.write(str(template_roi))
                         usb.write("\r\n")
                     if CMD == "OFFSET_ROI?":
-                        usb.write(offset_roi)
+                        usb.write(str(offset_roi))
                         usb.write("\r\n")
                     if CMD == "INFO?":
                         usb.write("Commands: GET: PIC, DIP_ROI?,MODEL?,LED_ROI?,MODEL_ROI?,OFFSET_ROI?,INFO?  \r\n")
-                        usb.write("SET: LED_SET:(n,r,g,b), DIP_ROI:(x,y,w,h),LED_ROI:(x,y,w,h),MODEL_ROI:(x,y,w,h),OFFSET_ROI::(x,y,w,h)\r\n")
+                        usb.write("SET: FLASH_SINGLE_COLOR:(n,r,g,b),FLASH_ALL_COLOR:(r,g,b), DIP_ROI:(x,y,w,h),LED_ROI:(x,y,w,h),MODEL_ROI:(x,y,w,h),OFFSET_ROI::(x,y,w,h)\r\n")
                         usb.write("\r\n")
 
 
             elif FCT == "SET":
                 if CMD:
-                    if CMD == "LED_SET":
-                        VALUE=VALUE.strip()
-                        led_array_set=VALUE
+                    VALUE=VALUE.strip()
+                    VALUE=VALUE.strip("(")
+                    VALUE=VALUE.strip(")")
+                    if CMD == "FLASH_ALL_COLOR":
+                        all_led_array_set=tuple(map(int, VALUE.split(',')))
+                        print(VALUE)
+                        set_all_ledcolor(all_led_array_set[0],all_led_array_set[1],all_led_array_set[2],)
+                    if CMD == "FLASH_SINGLE_COLOR":
+                        led_array_set=tuple(map(int, VALUE.split(',')))
                         print(VALUE)
                         set_led_color(led_array_set[0],led_array_set[1],led_array_set[2],led_array_set[3])
                     if CMD == "LED_CLEAR":
                         set_all_ledcolor(0, 0, 0)
                     if CMD == "DIP_ROI":
-                        VALUE=VALUE.strip()
                         print(VALUE)
-                        dip_roi=VALUE
+                        dip_roi=tuple(map(int, VALUE.split(',')))
                         print(dip_roi)
                     if CMD == "LED_ROI":
-                        VALUE=VALUE.strip()
                         print(VALUE)
-                        led_roi=VALUE
-                        print(dip_roi)
+                        led_roi=tuple(map(int, VALUE.split(',')))
+                        print(led_roi)
                     if CMD == "MODEL_ROI":
-                        VALUE=VALUE.strip()
                         print(VALUE)
-                        template_roi=VALUE
-                        print(dip_roi)
+                        template_roi=tuple(map(int, VALUE.split(',')))
+                        print(template_roi)
                     if CMD == "OFFSET_ROI":
-                        VALUE=VALUE.strip()
                         print(VALUE)
-                        offset_roi=VALUE
+                        offset_roi=tuple(map(int, VALUE.split(',')))
                         print(offset_roi)
 
             for sc in scpi_chain:
