@@ -1,5 +1,4 @@
 include("$(MPY_DIR)/extmod/asyncio")
-include("$(OMV_LIB_DIR)/", "template24V.pgm")
 
 # Drivers
 require("onewire")
