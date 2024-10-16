@@ -1,4 +1,5 @@
 include("$(MPY_DIR)/extmod/asyncio")
+freeze ("$(OMV_LIB_DIR)/", "template24V.pgm")
 
 # Drivers
 require("onewire")
