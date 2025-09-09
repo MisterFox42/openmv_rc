@@ -1,4 +1,5 @@
-#Copyright 2024, Maximilian Haidn, All rights reserved.
+#Copyright 2025, Maximilian Haidn, All rights reserved.
+#OPENMV_MX_Machinevision_Recom_v2.0
 
 import sensor
 import ustruct
@@ -12,7 +13,7 @@ templatefid = image.Image("/templateheat.pgm")
 template24 = image.Image("/template24V.pgm")
 template48 = image.Image("/template48V.pgm")
 
-version_text="OPENMV_MX_Machinevision_Recom-Maximilian_Haidn-v1.22 \r\n"
+version_text="OPENMV_MX_Machinevision_RACPRO-Ing.Maximilian_Haidn-v2.0 \r\n"
 
 i=0
 usb_ena=False
