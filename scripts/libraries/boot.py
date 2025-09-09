@@ -1,5 +1,9 @@
 #Copyright 2025, Maximilian Haidn, All rights reserved.
 #OPENMV_MX_Machinevision_Recom_v2.0
+#2.0 changed versioning, added status LED signals
+#Blue LED 1s blinking: Stable in main loop
+#Green LED short flash: received message (undefined)
+#
 
 import sensor
 import ustruct
@@ -9,18 +13,18 @@ import image
 from machine import UART, SoftI2C, Pin, LED
 from image import SEARCH_EX
 
-templatefid = image.Image("/templateheat.pgm")
-template24 = image.Image("/template24V.pgm")
-template48 = image.Image("/template48V.pgm")
+try:
+    templatefid = image.Image("/templateheat.pgm")
+    template24 = image.Image("/template24V.pgm")
+    template48 = image.Image("/template48V.pgm")
+except Exception as e:
+    print(e)
 
 version_text="OPENMV_MX_Machinevision_RACPRO-Ing.Maximilian_Haidn-v2.0 \r\n"
 
 i=0
-usb_ena=False
-if usb_ena:
-    usb = USB_VCP()
-else:
-    usb = UART(1 , 115200 , timeout_char=50)
+
+usb = UART(1 , 115200 , timeout_char=50)
 
 FCT="Null"
 CMD="Null"
@@ -47,7 +51,10 @@ sensor.set_auto_gain(False, gain_db=20)
 sensor.set_auto_whitebal(False)
 clock = time.clock()
 
-
+# --- LED blink timer setup ---
+last_blink = time.ticks_ms()
+blink_state = False
+blink_interval = 1000  # 1s full period → toggle every 500ms
 
 
 thresholds = [
@@ -299,8 +306,13 @@ def set_all_ledcolor(red, green, blue):
                 +green.to_bytes(1, 'big')
                 +blue.to_bytes(1, 'big'))
 
+ledgreen.off()
+ledred.off()
+ledblue.off()
 
 time.sleep(0.2)
+
+
 
 try:
     locked_template_pos=positionmatch()
@@ -313,15 +325,27 @@ try:
 except Exception as e:
     print(e)
 
-ledgreen.on()
+
+
 while True:
+
+    ledgreen.off()
+
+    # --- LED blinking ---
+    now = time.ticks_ms()
+    if time.ticks_diff(now, last_blink) >= blink_interval // 2:
+        last_blink = now
+        blink_state = not blink_state
+        if blink_state:
+            ledblue.on()
+        else:
+            ledblue.off()
+
     clock.tick()
-    ledblue.off()
     img = sensor.snapshot()
     if usb.any():
-        ledblue.on()
-        print("recd_data")
         try:
+            ledgreen.on()
             recd_data=usb.read()
             recd_data=str(recd_data)
             recd_data=recd_data.strip("b'")
@@ -362,53 +386,51 @@ while True:
                             usb.write(str(dp))
                         usb.write("\r\n")
                     if CMD == "DIP_ROI?":
-                        usb.write(str(dip_roi))
+                        usb.write(dip_roi)
                         usb.write("\r\n")
                     if CMD == "LED_ROI?":
-                        usb.write(str(led_roi))
+                        usb.write(led_roi)
                         usb.write("\r\n")
                     if CMD == "MODEL_ROI?":
-                        usb.write(str(template_roi))
+                        usb.write(model_roi)
                         usb.write("\r\n")
                     if CMD == "OFFSET_ROI?":
-                        usb.write(str(offset_roi))
+                        usb.write(offset_roi)
                         usb.write("\r\n")
                     if CMD == "INFO?":
                         usb.write("Commands: GET: PIC, DIP_ROI?,MODEL?,LED_ROI?,MODEL_ROI?,OFFSET_ROI?,INFO?  \r\n")
-                        usb.write("SET: FLASH_SINGLE_COLOR:(n,r,g,b),FLASH_ALL_COLOR:(r,g,b), DIP_ROI:(x,y,w,h),LED_ROI:(x,y,w,h),MODEL_ROI:(x,y,w,h),OFFSET_ROI::(x,y,w,h)\r\n")
+                        usb.write("SET: LED_SET:(n,r,g,b), DIP_ROI:(x,y,w,h),LED_ROI:(x,y,w,h),MODEL_ROI:(x,y,w,h),OFFSET_ROI::(x,y,w,h)\r\n")
                         usb.write("\r\n")
 
 
             elif FCT == "SET":
                 if CMD:
-                    VALUE=VALUE.strip()
-                    VALUE=VALUE.strip("(")
-                    VALUE=VALUE.strip(")")
-                    if CMD == "FLASH_ALL_COLOR":
-                        all_led_array_set=tuple(map(int, VALUE.split(',')))
-                        print(VALUE)
-                        set_all_ledcolor(all_led_array_set[0],all_led_array_set[1],all_led_array_set[2],)
-                    if CMD == "FLASH_SINGLE_COLOR":
-                        led_array_set=tuple(map(int, VALUE.split(',')))
+                    if CMD == "LED_SET":
+                        VALUE=VALUE.strip()
+                        led_array_set=VALUE
                         print(VALUE)
                         set_led_color(led_array_set[0],led_array_set[1],led_array_set[2],led_array_set[3])
                     if CMD == "LED_CLEAR":
                         set_all_ledcolor(0, 0, 0)
                     if CMD == "DIP_ROI":
+                        VALUE=VALUE.strip()
                         print(VALUE)
-                        dip_roi=tuple(map(int, VALUE.split(',')))
+                        dip_roi=VALUE
                         print(dip_roi)
                     if CMD == "LED_ROI":
+                        VALUE=VALUE.strip()
                         print(VALUE)
-                        led_roi=tuple(map(int, VALUE.split(',')))
-                        print(led_roi)
+                        led_roi=VALUE
+                        print(dip_roi)
                     if CMD == "MODEL_ROI":
+                        VALUE=VALUE.strip()
                         print(VALUE)
-                        template_roi=tuple(map(int, VALUE.split(',')))
-                        print(template_roi)
+                        template_roi=VALUE
+                        print(dip_roi)
                     if CMD == "OFFSET_ROI":
+                        VALUE=VALUE.strip()
                         print(VALUE)
-                        offset_roi=tuple(map(int, VALUE.split(',')))
+                        offset_roi=VALUE
                         print(offset_roi)
 
             for sc in scpi_chain:
