@@ -4,7 +4,7 @@ on:
   push:
     tags:
       - 'v*.*.*'
-    branches:    
+    branches:
       - 'master'
     paths:
       - 'src/**'
@@ -14,7 +14,7 @@ on:
       - '!**.rst'
 
   pull_request:
-    branches:    
+    branches:
       - 'master'
     paths:
       - 'src/**'
@@ -22,6 +22,7 @@ on:
       - '.github/workflows/*.json'
       - '!**/README.md'
       - '!**.rst'
+
   workflow_dispatch:
     inputs:
       logLevel:
@@ -30,172 +31,167 @@ on:
         default: 'warning'
         type: choice
         options:
-        - info
-        - warning
-        - debug
+          - info
+          - warning
+          - debug
       tags:
         description: 'Test scenario tags'
         required: false
         type: boolean
-      environment:
-        description: 'Environment to run tests against'
-        type: environment
-        required: true
 
 jobs:
   build-firmware:
     runs-on: ubuntu-22.04
     strategy:
       matrix:
-        #target: [OPENMV2, OPENMV3, OPENMV4, OPENMV4P, OPENMVPT, OPENMV_RT1060, ARDUINO_PORTENTA_H7, ARDUINO_GIGA, ARDUINO_NICLA_VISION, ARDUINO_NANO_RP2040_CONNECT, ARDUINO_NANO_33_BLE_SENSE]
         target: [OPENMV_RT1060]
-      fail-fast: false 
+      fail-fast: false
     steps:
-    - name: '⏳ Checkout repository'
-      uses: actions/checkout@v4
-      with:
-        submodules: false
+      - name: '⏳ Checkout repository'
+        uses: actions/checkout@v4
+        with:
+          submodules: false
 
-    - name: '🧱 Update submodules'
-      run: source tools/ci.sh && ci_update_submodules
+      - name: '🧱 Update submodules'
+        run: source tools/ci.sh && ci_update_submodules
 
-    - name: '♻ Caching dependencies'
-      uses: actions/cache@v4.0.2
-      id: cache
-      with:
-        path: |
-          ~/cache/gcc
-          ~/cache/llvm
-        key: 'toolchain_gcc-13.2.rel1_llvm-18.1.3'
+      - name: '♻ Caching dependencies'
+        uses: actions/cache@v4.0.2
+        id: cache
+        with:
+          path: |
+            ~/cache/gcc
+            ~/cache/llvm
+          key: 'toolchain_gcc-13.2.rel1_llvm-18.1.3'
 
-    - name: '🐍 Install Python'
-      uses: actions/setup-python@v5
-      with:
-        cache: 'pip'
-        python-version: "3.12.4"
+      - name: '🐍 Install Python'
+        uses: actions/setup-python@v5
+        with:
+          cache: 'pip'
+          python-version: "3.12.4"
 
-    - name: '🛠 Install Vela'
-      run: |
-        pip install ethos-u-vela==3.12.0
-        vela --version
+      - name: '🛠 Install Vela'
+        run: |
+          pip install ethos-u-vela==3.12.0
+          vela --version
 
-    - name: '🛠 Install GCC toolchain '
-      if: steps.cache.outputs.cache-hit != 'true'
-      run: source tools/ci.sh && ci_install_arm_gcc
+      - name: '🛠 Install GCC toolchain '
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: source tools/ci.sh && ci_install_arm_gcc
 
-    - name: '🛠 Install LLVM toolchain '
-      if: steps.cache.outputs.cache-hit != 'true'
-      run: source tools/ci.sh && ci_install_arm_llvm
+      - name: '🛠 Install LLVM toolchain '
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: source tools/ci.sh && ci_install_arm_llvm
 
-    - name: '🏗 Build firmware'
-      run: source tools/ci.sh && ci_build_target ${{ matrix.target }}
+      - name: '🏗 Build firmware'
+        run: source tools/ci.sh && ci_build_target ${{ matrix.target }}
 
-    - name: '⬆ Upload artifacts'
-      uses: actions/upload-artifact@v4
-      with:
-        name: ${{ matrix.target }}
-        path: ${{ matrix.target }}
-        if-no-files-found: error
+      - name: '⬆ Upload artifacts'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.target }}
+          path: ${{ matrix.target }}
+          if-no-files-found: error
 
   code-size-report:
     needs: build-firmware
     runs-on: ubuntu-22.04
     if: github.event_name == 'pull_request'
     steps:
-    - name: '⏳ Checkout repository'
-      uses: actions/checkout@v4
-      with:
-        submodules: false
+      - name: '⏳ Checkout repository'
+        uses: actions/checkout@v4
+        with:
+          submodules: false
 
-    - name: '♻ Caching dependencies'
-      uses: actions/cache@v4.0.2
-      id: cache
-      with:
-        path: |
-          ~/cache/gcc
-          ~/cache/llvm
-        key: 'toolchain_gcc-13.2.rel1_llvm-18.1.3'
+      - name: '♻ Caching dependencies'
+        uses: actions/cache@v4.0.2
+        id: cache
+        with:
+          path: |
+            ~/cache/gcc
+            ~/cache/llvm
+          key: 'toolchain_gcc-13.2.rel1_llvm-18.1.3'
 
-    - name: '🐍 Install Python'
-      uses: actions/setup-python@v5
-      with:
-        cache: 'pip'
-        python-version: "3.12.4"
+      - name: '🐍 Install Python'
+        uses: actions/setup-python@v5
+        with:
+          cache: 'pip'
+          python-version: "3.12.4"
 
-    - name: '🛠 Install dependencies'
-      run: |
-        pip install tabulate==0.9.0
+      - name: '🛠 Install dependencies'
+        run: |
+          pip install tabulate==0.9.0
 
-    - name: '↓ Download artifacts'
-      uses: actions/download-artifact@v4
-      with:
-        path: new_firmware
-        merge-multiple: false
+      - name: '↓ Download artifacts'
+        uses: actions/download-artifact@v4
+        with:
+          path: new_firmware
+          merge-multiple: false
 
-    - name: '↓ Download release'
-      uses: robinraju/release-downloader@v1
-      with:
-        repository: 'openmv/openmv'
-        tag: 'development'
-        fileName: '*.zip'
-        extract: false
-        out-file-path: 'old_firmware'
+      - name: '↓ Download release'
+        uses: robinraju/release-downloader@v1
+        with:
+          repository: 'openmv/openmv'
+          tag: 'development'
+          fileName: '*.zip'
+          extract: false
+          out-file-path: 'old_firmware'
 
-    - name: '📝 Generate report'
-      run: |
-        TOOLCHAIN_PATH=${HOME}/cache/gcc
-        export PATH=${TOOLCHAIN_PATH}/bin:${PATH}
-        python tools/code_size.py > ${GITHUB_WORKSPACE}/${{ github.event.pull_request.number }}.md
+      - name: '📝 Generate report'
+        run: |
+          TOOLCHAIN_PATH=${HOME}/cache/gcc
+          export PATH=${TOOLCHAIN_PATH}/bin:${PATH}
+          python tools/code_size.py > ${GITHUB_WORKSPACE}/${{ github.event.pull_request.number }}.md
 
-    - name: '⬆ Upload report'
-      uses: actions/upload-artifact@v4
-      with:
-        overwrite: true
-        name: code-size-report
-        path: ${{ github.event.pull_request.number }}.md
-        if-no-files-found: error
+      - name: '⬆ Upload report'
+        uses: actions/upload-artifact@v4
+        with:
+          overwrite: true
+          name: code-size-report
+          path: ${{ github.event.pull_request.number }}.md
+          if-no-files-found: error
 
   stable-release:
     needs: build-firmware
     runs-on: ubuntu-22.04
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     steps:
-    - name: '⏳ Checkout repository'
-      uses: actions/checkout@v4
-      with:
-        submodules: false
+      - name: '⏳ Checkout repository'
+        uses: actions/checkout@v4
+        with:
+          submodules: false
 
-    - name: '↓ Download artifacts'
-      uses: actions/download-artifact@v4
-      with:
-        path: firmware
+      - name: '↓ Download artifacts'
+        uses: actions/download-artifact@v4
+        with:
+          path: firmware
 
-    - name: '📦 Package firmware'
-      run: source tools/ci.sh && ci_package_firmware_release ${{github.ref_name}}
+      - name: '📦 Package firmware'
+        run: source tools/ci.sh && ci_package_firmware_release ${{github.ref_name}}
 
-    - name: "✏️ Generate release changelog"
-      id: changelog
-      uses: mikepenz/release-changelog-builder-action@v5
-      with:
-        toTag: ${{ github.sha }}
-        configuration: '.github/workflows/changelog.json'
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: "✏️ Generate release changelog"
+        id: changelog
+        uses: mikepenz/release-changelog-builder-action@v5
+        with:
+          toTag: ${{ github.sha }}
+          configuration: '.github/workflows/changelog.json'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: '🔥 Create stable release'
-      uses: softprops/action-gh-release@v2
-      with:
-        draft: true
-        files: firmware_*.zip
-        body: ${{steps.changelog.outputs.changelog}}
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: '🔥 Create stable release'
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          files: firmware_*.zip
+          body: ${{steps.changelog.outputs.changelog}}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: '🧹 Remove artifacts'
-      uses: geekyeggo/delete-artifact@v5
-      with:
-        name: firmware
-        failOnError: false
+      - name: '🧹 Remove artifacts'
+        uses: geekyeggo/delete-artifact@v5
+        with:
+          name: firmware
+          failOnError: false
 
   development-release:
     needs: build-firmware
@@ -204,51 +200,51 @@ jobs:
     permissions:
       contents: write
     steps:
-    - name: '⏳ Checkout repository'
-      uses: actions/checkout@v4
-      with:
-        submodules: false
+      - name: '⏳ Checkout repository'
+        uses: actions/checkout@v4
+        with:
+          submodules: false
 
-    - name: '↓ Download artifacts'
-      uses: actions/download-artifact@v4
-      with:
-        path: firmware
+      - name: '↓ Download artifacts'
+        uses: actions/download-artifact@v4
+        with:
+          path: firmware
 
-    - name: '📦 Package firmware'
-      run: source tools/ci.sh && ci_package_firmware_development
+      - name: '📦 Package firmware'
+        run: source tools/ci.sh && ci_package_firmware_development
 
-    - name: '🧹 Delete old release'
-      uses: dev-drprasad/delete-tag-and-release@v1.1
-      with:
-        delete_release: true
-        tag_name: development
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: '🧹 Delete old release'
+        uses: dev-drprasad/delete-tag-and-release@v1.1
+        with:
+          delete_release: true
+          tag_name: development
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: "✏️ Generate release changelog"
-      id: changelog
-      uses: mikepenz/release-changelog-builder-action@v5
-      with:
-        toTag: ${{ github.sha }}
-        configuration: '.github/workflows/changelog.json'
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: "✏️ Generate release changelog"
+        id: changelog
+        uses: mikepenz/release-changelog-builder-action@v5
+        with:
+          toTag: ${{ github.sha }}
+          configuration: '.github/workflows/changelog.json'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: '🔥 Create development release'
-      uses: softprops/action-gh-release@v2
-      with:
-        draft: false
-        name: Development Release
-        tag_name: development
-        body: |
+      - name: '🔥 Create development release'
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: false
+          name: Development Release
+          tag_name: development
+          body: |
             **⚠️ This is a development release, and it may be unstable.**
             ${{steps.changelog.outputs.changelog}}
-        files: firmware/firmware_*.zip
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          files: firmware/firmware_*.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: '🧹 Remove artifacts'
-      uses: geekyeggo/delete-artifact@v5
-      with:
-        name: firmware
-        failOnError: false
+      - name: '🧹 Remove artifacts'
+        uses: geekyeggo/delete-artifact@v5
+        with:
+          name: firmware
+          failOnError: false
