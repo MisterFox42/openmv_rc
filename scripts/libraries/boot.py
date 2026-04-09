@@ -1,26 +1,28 @@
 #Copyright 2025, Maximilian Haidn, All rights reserved.
 #OPENMV_MX_Machinevision_Recom_v2.0
 #2.0 changed versioning, added status LED signals
+#2.1 fixed GET/SET of ROIs (eval, etc,.), updated Info
 #Blue LED 1s blinking: Stable in main loop
 #Green LED short flash: received message (undefined)
-#
+#FW: RACPRO_2.0
 
 import sensor
 import ustruct
 import time
-import machine
 import image
 from machine import UART, SoftI2C, Pin, LED
 from image import SEARCH_EX
 
-try:
-    templatefid = image.Image("/templateheat.pgm")
-    template24 = image.Image("/template24V.pgm")
-    template48 = image.Image("/template48V.pgm")
-except Exception as e:
-    print(e)
 
-version_text="OPENMV_MX_Machinevision_RACPRO-Ing.Maximilian_Haidn-v2.0 \r\n"
+try:
+    templatefid = image.Image("templateheat.pgm")
+    template24 = image.Image("template24V.pgm")
+    template48 = image.Image("template48V.pgm")
+except Exception as e:
+    print("pgm error:",e)
+
+
+version_text="OPENMV_MX_Machinevision_RACPRO-Ing.Maximilian_Haidn-v2.1_2604 \r\n"
 
 i=0
 
@@ -31,9 +33,13 @@ CMD="Null"
 VALUE="Null"
 recd_str="None"
 
+#TODO: Try both variants?
 ledblue = LED("LED_BLUE")
 ledgreen = LED("LED_GREEN")
 ledred = LED("LED_RED")
+#ledblue = LED(3)
+#ledgreen = LED(2)
+#ledred = LED(1)
 
 #i2c = machine.I2C(1, freq=400000)
 i2c  = SoftI2C(scl=Pin('P0'), sda=Pin('P1'), freq=100000)
@@ -313,7 +319,7 @@ ledblue.off()
 time.sleep(0.2)
 
 
-
+print("debug")
 try:
     locked_template_pos=positionmatch()
     print(locked_template_pos)
@@ -389,17 +395,17 @@ while True:
                         usb.write(dip_roi)
                         usb.write("\r\n")
                     if CMD == "LED_ROI?":
-                        usb.write(led_roi)
+                        usb.write(str(led_roi) + "\n") #Change this for all
                         usb.write("\r\n")
                     if CMD == "MODEL_ROI?":
-                        usb.write(model_roi)
+                        usb.write(template_roi)
                         usb.write("\r\n")
                     if CMD == "OFFSET_ROI?":
                         usb.write(offset_roi)
                         usb.write("\r\n")
                     if CMD == "INFO?":
-                        usb.write("Commands: GET: PIC, DIP_ROI?,MODEL?,LED_ROI?,MODEL_ROI?,OFFSET_ROI?,INFO?  \r\n")
-                        usb.write("SET: LED_SET:(n,r,g,b), DIP_ROI:(x,y,w,h),LED_ROI:(x,y,w,h),MODEL_ROI:(x,y,w,h),OFFSET_ROI::(x,y,w,h)\r\n")
+                        usb.write("Commands: GET:PIC,LEDS?,DIP?,DIP_ROI?,MODEL?,LED_ROI?,MODEL_ROI?,OFFSET_ROI?,INFO?  \r\n")
+                        usb.write("SET: LED_SET:(n,r,g,b),DIP_ROI:[(x,y,w,h),(x,y,w,h),..],LED_ROI:[(x,y,w,h),(x,y,w,h),..],MODEL_ROI:(x,y,w,h),OFFSET_ROI:(x,y,w,h)\r\n")
                         usb.write("\r\n")
 
 
@@ -411,26 +417,27 @@ while True:
                         print(VALUE)
                         set_led_color(led_array_set[0],led_array_set[1],led_array_set[2],led_array_set[3])
                     if CMD == "LED_CLEAR":
+                        print("Leds cleared")
                         set_all_ledcolor(0, 0, 0)
                     if CMD == "DIP_ROI":
                         VALUE=VALUE.strip()
                         print(VALUE)
-                        dip_roi=VALUE
+                        dip_roi=eval(VALUE)
                         print(dip_roi)
                     if CMD == "LED_ROI":
                         VALUE=VALUE.strip()
                         print(VALUE)
-                        led_roi=VALUE
-                        print(dip_roi)
+                        led_roi=eval(VALUE)
+                        print(led_roi)
                     if CMD == "MODEL_ROI":
                         VALUE=VALUE.strip()
                         print(VALUE)
-                        template_roi=VALUE
-                        print(dip_roi)
+                        template_roi=eval(VALUE)
+                        print(template_roi)
                     if CMD == "OFFSET_ROI":
                         VALUE=VALUE.strip()
                         print(VALUE)
-                        offset_roi=VALUE
+                        offset_roi=eval(VALUE)
                         print(offset_roi)
 
             for sc in scpi_chain:
